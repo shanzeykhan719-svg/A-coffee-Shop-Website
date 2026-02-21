@@ -1,0 +1,1540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>The Debug Café — Tech Café Experience</title>
+<meta name="description" content="The Debug Café - Tech-themed coffee shop with curated brews for focused minds. Fuel your code with caffeine.">
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0f0f10;
+    --panel:#141313;
+    --muted:#9c8f84;
+    --accent:#c69b3c;
+    --neon:#39ffca;
+    --glass: rgba(255,255,255,0.03);
+    --transition-slow: 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --transition-medium: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --transition-fast: 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;color:#f5efe6;background:var(--bg);-webkit-font-smoothing:antialiased;scroll-behavior: smooth;}
+  button{font-family:inherit;cursor:pointer;border:0}
+
+  /* INTRO: full-screen video overlay - SHOWS FIRST */
+  #introWrap{
+    position:fixed;
+    inset:0;
+    z-index:10000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#000;
+    transition:opacity .9s ease, transform 1.2s ease;
+  }
+  #introWrap.fade{
+    opacity:0;
+    transform: scale(1.1);
+    pointer-events:none;
+  }
+  #introVideo{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  /* Skip Intro Button */
+  .skip-intro {
+    position: absolute;
+    bottom: 30px;
+    right: 30px;
+    background: var(--accent);
+    color: #0f0f10;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    z-index: 10001;
+    transition: all 0.3s ease;
+  }
+  
+  .skip-intro:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(198, 155, 60, 0.4);
+  }
+
+  /* Video Fallback */
+  .video-fallback {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: white;
+    text-align: center;
+    padding: 20px;
+  }
+
+  /* Loading Screen - SHOWS AFTER VIDEO */
+  .loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: none; /* Hidden by default */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    transition: opacity 0.8s ease, visibility 0.8s ease;
+  }
+  
+  .loading-screen.active {
+    display: flex;
+  }
+  
+  .loading-screen.hidden {
+    opacity: 0;
+    visibility: hidden;
+  }
+  
+  .coffee-loader {
+    width: 60px;
+    height: 60px;
+    border: 3px solid rgba(198, 155, 60, 0.3);
+    border-top: 3px solid var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* background image (behind content) */
+  .pageBg{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background: linear-gradient(45deg, #0f0f10 0%, #1a1a1a 100%);
+    transition:filter .6s ease,transform 1.2s ease;
+    transform: scale(1);
+  }
+  .pageBg.dim{
+    filter:brightness(.25) saturate(.8);
+    transform:scale(1.05);
+  }
+
+  /* app container */
+  .app{
+    position:relative;
+    z-index:2;
+    min-height:100vh;
+    padding-bottom:80px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 1s ease, transform 1s ease;
+  }
+  
+  .app.loaded {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Floating particles animation */
+  .particles {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  
+  .particle {
+    position: absolute;
+    background: rgba(198, 155, 60, 0.1);
+    border-radius: 50%;
+    animation: float 15s infinite linear;
+  }
+  
+  @keyframes float {
+    0% {
+      transform: translateY(100vh) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.3;
+    }
+    90% {
+      opacity: 0.3;
+    }
+    100% {
+      transform: translateY(-100px) rotate(360deg);
+      opacity: 0;
+    }
+  }
+
+  /* Rest of your CSS remains the same... */
+  .topBar{
+    position:sticky;
+    top:18px;
+    z-index:8;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:8px 24px;
+    transition: transform 0.4s ease;
+  }
+  
+  .topBar.scrolled {
+    transform: translateY(-10px);
+  }
+  
+  .topInner{
+    max-width:1300px;
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+  }
+  .brand {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:2px;
+    transition: transform 0.4s ease;
+  }
+  
+  .brand:hover {
+    transform: translateY(-2px);
+  }
+  
+  .brand .logo {
+    font-family:'Playfair Display',serif;
+    font-size:28px;
+    color:var(--accent);
+    letter-spacing:1px;
+    text-shadow:0 6px 30px rgba(198,155,60,0.08);
+    transition: text-shadow 0.4s ease;
+  }
+  
+  .brand:hover .logo {
+    text-shadow: 0 8px 40px rgba(198,155,60,0.15);
+  }
+  
+  .brand .tag {
+    color:var(--muted);
+    font-size:12px;
+    transition: color 0.4s ease;
+  }
+
+  /* Cart Icon in Header */
+  .cart-icon {
+    position: relative;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 16px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    font-weight: 600;
+  }
+
+  .cart-icon:hover {
+    background: rgba(255,255,255,0.08);
+    color: #f5efe6;
+    transform: translateY(-2px);
+  }
+
+  .cart-count {
+    background: var(--accent);
+    color: #0f0f10;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    transition: transform 0.3s ease;
+  }
+
+  /* MODAL CART */
+  .cart-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.4s ease;
+    backdrop-filter: blur(5px);
+  }
+
+  .cart-modal.active {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .cart-content {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translateY(30px);
+    transition: transform 0.4s ease;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  }
+
+  .cart-modal.active .cart-content {
+    transform: translateY(0);
+  }
+
+  .cart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .cart-header h3 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 24px;
+  }
+
+  .close-cart {
+    background: transparent;
+    color: var(--muted);
+    font-size: 24px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+  }
+
+  .close-cart:hover {
+    background: rgba(255,255,255,0.05);
+    color: #f5efe6;
+  }
+
+  /* Cart items styles */
+  .cartList{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    max-height:50vh;
+    overflow:auto;
+    padding-right:6px;
+    margin-bottom: 20px;
+  }
+  
+  .cartRow{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    animation: slideInRight 0.4s ease;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  .cartRow .name{font-weight:700}
+  .cartSmallBtn{
+    background:transparent;
+    border-radius:8px;
+    padding:6px 8px;
+    color:var(--muted);
+    border:1px solid rgba(255,255,255,0.04);
+    transition: all 0.3s ease;
+  }
+  
+  .cartSmallBtn:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--accent);
+  }
+  
+  .cartTotal{
+    display:flex;
+    justify-content:space-between;
+    margin-top:12px;
+    font-weight:800;
+    color:var(--accent);
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 18px;
+  }
+  
+  .checkoutBtn{
+    margin-top:20px;
+    width:100%;
+    padding:14px;
+    border-radius:12px;
+    background:var(--accent);
+    color:#0f0f10;
+    font-weight:800;
+    cursor:pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    font-size: 16px;
+  }
+  
+  .checkoutBtn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  .checkoutBtn:hover::before {
+    left: 100%;
+  }
+  
+  .checkoutBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(198, 155, 60, 0.3);
+  }
+
+  /* Hero */
+  .heroWrap{
+    max-width:1300px;
+    margin:72px auto 24px;
+    padding:28px;
+    border-radius:14px;
+    display:flex;
+    gap:24px;
+    align-items:center;
+    position:relative;
+    z-index:3;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 1s ease 0.3s, transform 1s ease 0.3s;
+  }
+  
+  .app.loaded .heroWrap {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .heroLeft{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  
+  .heroTitle{
+    font-family:'Playfair Display',serif;
+    font-size:64px;
+    line-height:1;
+    color:var(--accent);
+    text-align:center;
+    margin:0;
+    text-shadow:0 12px 40px rgba(198,155,60,0.06);
+    position: relative;
+    display: inline-block;
+  }
+  
+  .heroTitle::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: width 0.8s ease 0.5s;
+  }
+  
+  .app.loaded .heroTitle::after {
+    width: 100px;
+  }
+  
+  .heroTag{
+    font-size:18px;
+    color:var(--muted);
+    text-align:center;
+    margin:0;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.8s ease 0.6s, transform 0.8s ease 0.6s;
+  }
+  
+  .app.loaded .heroTag {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .heroCtas{
+    display:flex;
+    gap:12px;
+    justify-content:center;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.8s ease 0.8s, transform 0.8s ease 0.8s;
+  }
+  
+  .app.loaded .heroCtas {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .btnPrimary{
+    background:linear-gradient(90deg,var(--accent),#b38834);
+    padding:12px 18px;
+    border-radius:12px;
+    color:#0f0f10;
+    font-weight:800;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btnPrimary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  .btnPrimary:hover::before {
+    left: 100%;
+  }
+  
+  .btnPrimary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(198, 155, 60, 0.4);
+  }
+  
+  .btnSecondary{
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.06);
+    padding:12px 18px;
+    border-radius:12px;
+    color:var(--muted);
+    transition: all 0.3s ease;
+  }
+  
+  .btnSecondary:hover {
+    border-color: rgba(255,255,255,0.15);
+    color: #f5efe6;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+
+  .heroRight{
+    width:420px;
+    height:260px;
+    border-radius:12px;
+    overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,0.6);
+    opacity: 0;
+    transform: translateX(30px);
+    transition: opacity 1s ease 1s, transform 1s ease 1s;
+    background: linear-gradient(45deg, rgba(198, 155, 60, 0.1), rgba(57, 255, 202, 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .app.loaded .heroRight {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  
+  .heroRight img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    filter:contrast(1.05) saturate(1.05);
+    transition: transform 0.8s ease;
+  }
+  
+  .heroRight:hover img {
+    transform: scale(1.05);
+  }
+
+  /* categories */
+  .categoriesWrap{
+    max-width:1300px;
+    margin:28px auto;
+    display:flex;
+    gap:20px;
+    justify-content:center;
+    padding:0 12px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.8s ease 1.2s, transform 0.8s ease 1.2s;
+  }
+  
+  .app.loaded .categoriesWrap {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .catBig{
+    flex:1;
+    min-height:160px;
+    border-radius:14px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    cursor:pointer;
+    box-shadow:0 18px 60px rgba(0,0,0,0.6);
+    transition:transform .24s,box-shadow .24s, background .3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .catBig::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    transition: left 0.6s ease;
+  }
+  
+  .catBig:hover::before {
+    left: 100%;
+  }
+  
+  .catBig:hover{
+    transform:translateY(-8px) scale(1.02);
+    box-shadow:0 36px 120px rgba(0,0,0,0.75);
+    background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  }
+  
+  .catIcon{
+    font-size:46px;
+    transition: transform 0.4s ease;
+  }
+  
+  .catBig:hover .catIcon {
+    transform: scale(1.2);
+  }
+  
+  .catLabel{
+    font-weight:800;
+    color:var(--accent);
+    transition: color 0.3s ease;
+  }
+
+  /* VIEW MENU button */
+  .viewMenuWrap{
+    display:flex;
+    justify-content:center;
+    margin-top:18px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.8s ease 1.4s, transform 0.8s ease 1.4s;
+  }
+  
+  .app.loaded .viewMenuWrap {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .viewMenuBtn{
+    padding:12px 22px;
+    border-radius:999px;
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.06);
+    color:var(--muted);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .viewMenuBtn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  .viewMenuBtn:hover::before {
+    left: 100%;
+  }
+  
+  .viewMenuBtn:hover {
+    border-color: rgba(255,255,255,0.15);
+    color: #f5efe6;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+
+  /* vertical menu layout */
+  .menuSection{
+    max-width:1200px;
+    margin:28px auto 120px;
+    padding:0 12px;
+  }
+  
+  .menuHeader{
+    font-family:'Playfair Display',serif;
+    font-size:28px;
+    color:var(--accent);
+    margin:8px 0 18px;
+    text-align:center;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  
+  .menuHeader.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .productCard{
+    display:grid;
+    grid-template-columns:420px 1fr;
+    gap:20px;
+    align-items:center;
+    padding:18px;
+    border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    margin-bottom:20px;
+    box-shadow:0 18px 40px rgba(0,0,0,0.55);
+    transform:translateY(28px);
+    opacity:0;
+    transition:transform .7s cubic-bezier(.2,.9,.3,1),opacity .5s, box-shadow 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .productCard::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.02), transparent);
+    transition: left 0.6s ease;
+  }
+  
+  .productCard:hover::before {
+    left: 100%;
+  }
+  
+  .productCard.in-view{
+    transform:none;
+    opacity:1;
+  }
+  
+  .productCard:hover {
+    box-shadow: 0 25px 60px rgba(0,0,0,0.7);
+    transform: translateY(-5px);
+  }
+  
+  .productImg{
+    width:100%;
+    height:320px;
+    border-radius:10px;
+    overflow:hidden;
+    background:#111;
+    position: relative;
+    background: linear-gradient(45deg, rgba(198, 155, 60, 0.1), rgba(57, 255, 202, 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  
+  .productImg::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  
+  .productCard:hover .productImg::after {
+    opacity: 1;
+  }
+  
+  .productImg img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+    transition:transform .8s ease;
+  }
+  
+  .productCard:hover .productImg img {
+    transform: scale(1.08);
+  }
+  
+  .productMeta{
+    padding-right:12px;
+  }
+  
+  .pTitle{
+    font-size:22px;
+    margin:0;
+    font-weight:800;
+    transition: color 0.3s ease;
+  }
+  
+  .productCard:hover .pTitle {
+    color: var(--accent);
+  }
+  
+  .pDesc{
+    color:var(--muted);
+    margin:8px 0 14px;
+    transition: color 0.3s ease;
+  }
+  
+  .pRow{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+  }
+  
+  .price {
+    font-weight: 700;
+    color: var(--accent);
+    font-size: 18px;
+    transition: transform 0.3s ease;
+  }
+  
+  .productCard:hover .price {
+    transform: scale(1.05);
+  }
+
+  .orderControls{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  
+  .qtyCtl{
+    display:flex;
+    align-items:center;
+    background:rgba(255,255,255,0.02);
+    border-radius:10px;
+    padding:6px;
+    border: 1px solid rgba(255,255,255,0.03);
+  }
+  
+  .qtyBtn{
+    background:transparent;
+    color:var(--muted);
+    padding:6px 8px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.03);
+    cursor:pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .qtyBtn:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--accent);
+  }
+  
+  .qtyInput{
+    width:56px;
+    text-align:center;
+    border:none;
+    background:transparent;
+    color:#f5efe6;
+    font-weight:700;
+  }
+
+  .orderNow{
+    background:linear-gradient(90deg,var(--neon),#d2ffec);
+    color:#06120f;
+    padding:10px 16px;
+    border-radius:10px;
+    font-weight:800;
+    box-shadow:0 10px 30px rgba(57,255,202,0.08);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .orderNow::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  .orderNow:hover::before {
+    left: 100%;
+  }
+  
+  .orderNow:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 15px 35px rgba(57,255,202,0.15);
+  }
+
+  /* back to top center */
+  .backToTop{
+    display:flex;
+    justify-content:center;
+    margin-top:36px;
+  }
+  
+  .backTopBtn{
+    padding:12px 24px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.02);
+    border:1px solid rgba(255,255,255,0.04);
+    color:var(--muted);
+    cursor:pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .backTopBtn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  .backTopBtn:hover::before {
+    left: 100%;
+  }
+  
+  .backTopBtn:hover {
+    border-color: rgba(255,255,255,0.15);
+    color: #f5efe6;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  }
+
+  /* Notification */
+  .notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--accent);
+    color: #0f0f10;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 700;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    z-index: 100;
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  
+  .notification.show {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* small screens */
+  @media (max-width:1100px){
+    .heroWrap{flex-direction:column;align-items:center;padding:18px}
+    .heroTitle{font-size:44px}
+    .heroRight{width:100%;height:220px}
+    .productCard{grid-template-columns:1fr;padding:14px}
+    .productImg{height:220px}
+    .categoriesWrap{flex-direction:column;padding:12px}
+    .cart-content {
+      width: 95%;
+      margin: 20px;
+    }
+    .skip-intro {
+      bottom: 20px;
+      right: 20px;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+  }
+</style>
+</head>
+<body>
+
+  <!-- INTRO VIDEO - SHOWS FIRST -->
+  <div id="introWrap">
+    <video id="introVideo" autoplay muted playsinline>
+      <source src="introVideo.mp421" type="video/mp4">
+      <!-- Fallback content if video fails -->
+      <div class="video-fallback" id="videoFallback">
+        <div style="font-size:80px;margin-bottom:20px;">☕</div>
+        <h1 style="font-family:'Playfair Display',serif;font-size:48px;color:var(--accent);margin-bottom:20px;">The Debug Café</h1>
+        <p style="font-size:18px;color:var(--muted);margin-bottom:30px;">Fuel your code with caffeine</p>
+      </div>
+    </video>
+    <button class="skip-intro" id="skipIntro">Skip Intro</button>
+  </div>
+
+  <!-- LOADING SCREEN - SHOWS AFTER VIDEO -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="coffee-loader"></div>
+    <div>Brewing your experience...</div>
+  </div>
+
+  <!-- FLOATING PARTICLES -->
+  <div class="particles" id="particles"></div>
+
+  <!-- PAGE BG -->
+  <div class="pageBg" id="pageBg" aria-hidden="true"></div>
+
+  <!-- CART MODAL -->
+  <div class="cart-modal" id="cartModal">
+    <div class="cart-content">
+      <div class="cart-header">
+        <h3>🛒 Your Order</h3>
+        <button class="close-cart" id="closeCart">&times;</button>
+      </div>
+      <div class="cartList" id="cartList"><div style="color:var(--muted); text-align: center; padding: 20px;">Cart is empty — add a coffee ☕</div></div>
+      <div class="cartTotal"><div>Total</div><div id="cartTotal">₨0.00</div></div>
+      <button class="checkoutBtn" id="checkoutBtn">Place Order</button>
+    </div>
+  </div>
+
+  <!-- APP - SHOWS AFTER LOADING -->
+  <div class="app" id="app">
+
+    <!-- top bar -->
+    <div class="topBar" id="topBar">
+      <div class="topInner">
+        <div class="brand"><div class="logo">The Debug Café</div><div class="tag">tech x coffee</div></div>
+        <button class="cart-icon" id="cartIcon">
+          <span>Cart</span>
+          <div class="cart-count" id="cartCount">0</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- HERO -->
+    <section class="heroWrap" id="heroWrap" aria-label="Hero">
+      <div class="heroLeft">
+        <h1 class="heroTitle" id="heroTitle">The Debug Café</h1>
+        <p class="heroTag">Fuel your code with caffeine — curated brews for focused minds.</p>
+        <div class="heroCtas">
+          <button class="btnPrimary" id="btnOrderNow">Order Now →</button>
+          <button class="btnSecondary" id="btnViewMenu">View Full Menu</button>
+        </div>
+      </div>
+      <div class="heroRight">
+        <img src="Logo.jpg" alt="Coffee and laptop setup at The Debug Café" />
+      </div>
+    </section>
+
+    <!-- categories -->
+    <section class="categoriesWrap" role="navigation">
+      <div class="catBig" id="catHot" data-cat="hot"><div class="catIcon">🔥</div><div class="catLabel">Hot Brews</div></div>
+      <div class="catBig" id="catCold" data-cat="cold"><div class="catIcon">🧊</div><div class="catLabel">Cold Coffee</div></div>
+    </section>
+
+    <div class="viewMenuWrap"><button class="viewMenuBtn" id="viewMenuBtn">View Menu</button></div>
+
+    <!-- vertical menu -->
+    <main class="menuSection" id="menuSection">
+      <h2 class="menuHeader" id="menuHeader">Our Menu</h2>
+      <div id="productsContainer"></div>
+
+      <div class="backToTop"><button class="backTopBtn" id="backTopBtn">Back to Top</button></div>
+    </main>
+
+  </div>
+
+  <!-- NOTIFICATION -->
+  <div class="notification" id="notification">Item added to cart!</div>
+
+ <script>
+const MENU = [
+  { id:'java-loop', name:'Java Loop', price:380, desc:'Rich nutty notes; keeps your loop running.', section:'hot', img:'Java-loop.jpg' },
+  { id:'mocha-mode', name:'Mocha Mode', price:430, desc:'Chocolate warmth with velvety foam.', section:'hot', img:'mocha-mode.jpg' },
+  { id:'dark-roast', name:'Dark Roast Function', price:440, desc:'Bold, focused, zero-nonsense roast.', section:'hot', img:'dark-roast.jpg' },
+  { id:'latte-log', name:'Latte Log', price:350, desc:'Silky milk and gentle espresso hug.', section:'hot', img:'latte-log.jpg' },
+
+  { id:'iced-debugger', name:'Iced Debugger', price:480, desc:'Chilled espresso with caramel cloud.', section:'cold', img:'iced-debugger.jpg' },
+  { id:'syntax-chill', name:'Syntax Chill', price:420, desc:'Smooth cold brew with creamy finish.', section:'cold', img:'syntax-chill.jpg' },
+  { id:'caramel-cache', name:'Caramel Cache', price:450, desc:'Sweet caramel, salted balance.', section:'cold', img:'caramel-cache.jpg' },
+  { id:'byte-frappe', name:'Byte Frappe', price:400, desc:'Frappe topped with crunchy byte bits.', section:'cold', img:'byte-frappe.jpg' }
+];
+
+/* ================= ELEMENTS ================= */
+const loadingScreen = document.getElementById('loadingScreen');
+const particles = document.getElementById('particles');
+const introWrap = document.getElementById('introWrap');
+const introVideo = document.getElementById('introVideo');
+const videoFallback = document.getElementById('videoFallback');
+const skipIntro = document.getElementById('skipIntro');
+const pageBg = document.getElementById('pageBg');
+const app = document.getElementById('app');
+const topBar = document.getElementById('topBar');
+const productsContainer = document.getElementById('productsContainer');
+const btnViewMenu = document.getElementById('btnViewMenu');
+const btnOrderNow = document.getElementById('btnOrderNow');
+const catHot = document.getElementById('catHot');
+const catCold = document.getElementById('catCold');
+const viewMenuBtn = document.getElementById('viewMenuBtn');
+const backTopBtn = document.getElementById('backTopBtn');
+const menuHeader = document.getElementById('menuHeader');
+const cartModal = document.getElementById('cartModal');
+const cartIcon = document.getElementById('cartIcon');
+const closeCart = document.getElementById('closeCart');
+const cartCount = document.getElementById('cartCount');
+const notification = document.getElementById('notification');
+
+const cartList = document.getElementById('cartList');
+const cartTotal = document.getElementById('cartTotal');
+const checkoutBtn = document.getElementById('checkoutBtn');
+
+let CART = {};
+
+/* ========== PROPER FLOW: VIDEO → LOADING → CONTENT ========== */
+function showLoadingScreen() {
+  loadingScreen.classList.add('active');
+  setTimeout(() => {
+    initApp();
+  }, 2000);
+}
+
+function revealApp(){
+  introWrap.classList.add('fade');
+  setTimeout(() => { 
+    introWrap.style.display = 'none';
+    showLoadingScreen();
+  }, 900);
+}
+
+function showVideoFallback() {
+  introVideo.style.display = 'none';
+  videoFallback.style.display = 'flex';
+}
+
+/* ========== VIDEO HANDLING ========== */
+function initVideo() {
+  const playPromise = introVideo.play();
+  
+  if (playPromise !== undefined) {
+    playPromise.then(() => {
+      console.log('Video is playing automatically');
+    }).catch(error => {
+      console.log('Auto-play failed, showing fallback:', error);
+      showVideoFallback();
+      setTimeout(revealApp, 3000);
+    });
+  }
+}
+
+/* ========== CART MANAGEMENT ========== */
+function openCart() {
+  cartModal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCartModal() {
+  cartModal.classList.remove('active');
+  document.body.style.overflow = 'auto';
+}
+
+function updateCartCount() {
+  const totalItems = Object.values(CART).reduce((sum, item) => sum + item.qty, 0);
+  cartCount.textContent = totalItems;
+  
+  if (totalItems > 0) {
+    cartCount.style.transform = 'scale(1.2)';
+    setTimeout(() => {
+      cartCount.style.transform = 'scale(1)';
+    }, 300);
+  }
+}
+
+/* ========== LOADING & INITIALIZATION ========== */
+function initParticles() {
+  for (let i = 0; i < 15; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    const size = Math.random() * 6 + 2;
+    particle.style.width = `${size}px`;
+    particle.style.height = `${size}px`;
+    particle.style.left = `${Math.random() * 100}%`;
+    particle.style.animationDelay = `${Math.random() * 15}s`;
+    particles.appendChild(particle);
+  }
+}
+
+function showNotification(message) {
+  notification.textContent = message;
+  notification.classList.add('show');
+  setTimeout(() => {
+    notification.classList.remove('show');
+  }, 3000);
+}
+
+function initApp() {
+  loadingScreen.classList.add('hidden');
+  
+  setTimeout(() => {
+    app.classList.add('loaded');
+  }, 300);
+  
+  initParticles();
+  renderProducts();
+  renderCart();
+  setupScrollEffects();
+}
+
+/* ========== SETUP SCROLL EFFECTS ========== */
+function setupScrollEffects() {
+  window.addEventListener('scroll', () => {
+    const scrolled = window.scrollY > 50;
+    topBar.classList.toggle('scrolled', scrolled);
+    
+    const scrolledPx = window.scrollY;
+    pageBg.style.transform = `scale(${1 + scrolledPx * 0.0002})`;
+  }, { passive: true });
+  
+  const headerObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+      }
+    });
+  }, { threshold: 0.5 });
+  
+  headerObserver.observe(menuHeader);
+}
+
+/* ========== RENDER MENU - FIXED WITH ERROR HANDLING ========== */
+function renderProducts(filter=null){
+  productsContainer.innerHTML = '';
+  const list = filter ? MENU.filter(p => p.section === filter) : MENU;
+  list.forEach((p, i) => {
+    const article = document.createElement('article');
+    article.className = 'productCard';
+    article.innerHTML = `
+      <div class="productImg">
+        <img src="${p.img}" alt="${p.name}" loading="lazy" onerror="this.onerror=null; this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMyMCIgdmlld0JveD0iMCAwIDQwMCAzMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzIwIiBmaWxsPSIjMTQxMzEzIi8+CjxwYXRoIGQ9Ik0yMDAgMTYwQzIyMi4wOTEgMTYwIDI0MCAxNDIuMDkxIDI0MCAxMjBDMjQwIDk3LjkwODYgMjIyLjA5MSA4MCAyMDAgODBDMTc3LjkxIDgwIDE2MCA5Ny45MDg2IDE2MCAxMjBDMTYwIDE0Mi4wOTEgMTc3LjkxIDE2MCAyMDAgMTYwWiIgZmlsbD0iI0M2OUIzQyIvPgo8cGF0aCBkPSJNMTYwIDIwMEgyNDBWMjgwSDE2MFYyMDBaIiBmaWxsPSIjOUM4Rjg0Ii8+Cjwvc3ZnPgo='; this.alt='Image not available';" />
+      </div>
+      <div class="productMeta">
+        <h3 class="pTitle">${p.name}</h3>
+        <p class="pDesc">${p.desc}</p>
+        <div class="pRow">
+          <div class="price">₨${p.price.toFixed(2)}</div>
+          <div class="orderControls">
+            <div class="qtyCtl">
+              <button class="qtyBtn" data-op="dec">−</button>
+              <input class="qtyInput" type="number" min="1" value="1" />
+              <button class="qtyBtn" data-op="inc">+</button>
+            </div>
+            <button class="orderNow" data-id="${p.id}">Order Now</button>
+          </div>
+        </div>
+      </div>
+    `;
+    productsContainer.appendChild(article);
+
+    setTimeout(()=> {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+          }
+        });
+      }, { threshold: 0.1 });
+      
+      io.observe(article);
+    }, 100);
+  });
+
+  attachProductHandlers();
+}
+
+/* ========== PRODUCT INTERACTIONS ========== */
+function attachProductHandlers(){
+  productsContainer.querySelectorAll('.qtyBtn').forEach(btn=>{
+    btn.onclick = (e) => {
+      const parent = e.target.closest('.productMeta');
+      const input = parent.querySelector('.qtyInput');
+      let v = parseInt(input.value||'1',10);
+      if(btn.dataset.op === 'dec') v = Math.max(1, v - 1); else v = v + 1;
+      input.value = v;
+    };
+  });
+
+  productsContainer.querySelectorAll('.orderNow').forEach(btn=>{
+    btn.onclick = (e) => {
+      const id = btn.dataset.id;
+      const productArticle = e.target.closest('.productCard');
+      const qtyInput = productArticle.querySelector('.qtyInput');
+      const qty = Math.max(1, parseInt(qtyInput.value||'1',10));
+      const item = MENU.find(m => m.id === id);
+      if(!CART[id]) CART[id] = { item, qty: 0 };
+      CART[id].qty += qty;
+      renderCart();
+      
+      const prev = btn.textContent;
+      btn.textContent = 'Added ✓';
+      btn.style.background = 'linear-gradient(90deg, #4CAF50, #45a049)';
+      
+      showNotification(`${qty} ${item.name} added to cart!`);
+      
+      if (Object.keys(CART).length === 1) {
+        setTimeout(openCart, 500);
+      }
+      
+      setTimeout(()=> {
+        btn.textContent = prev;
+        btn.style.background = 'linear-gradient(90deg,var(--neon),#d2ffec)';
+      }, 1500);
+    };
+  });
+}
+
+/* ========== CART ========== */
+function renderCart(){
+  cartList.innerHTML = '';
+  const keys = Object.keys(CART);
+  if(keys.length === 0){
+    cartList.innerHTML = `<div style="color:var(--muted); text-align: center; padding: 20px;">Cart is empty — add a coffee ☕</div>`;
+    cartTotal.textContent = '₨0.00';
+    updateCartCount();
+    return;
+  }
+  let total = 0;
+  keys.forEach((id, index) => {
+    const { item, qty } = CART[id];
+    const row = document.createElement('div');
+    row.className = 'cartRow';
+    row.style.animationDelay = `${index * 0.1}s`;
+    row.innerHTML = `<div><div style="font-weight:800">${item.name}</div><div style="color:var(--muted);font-size:0.9rem">₨${item.price.toFixed(2)} × ${qty}</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="cartSmallBtn" data-id="${id}" data-op="dec">−</button>
+        <div style="min-width:26px;text-align:center">${qty}</div>
+        <button class="cartSmallBtn" data-id="${id}" data-op="inc">+</button>
+      </div>`;
+    cartList.appendChild(row);
+    total += item.price * qty;
+  });
+  cartTotal.textContent = '₨' + total.toFixed(2);
+  updateCartCount();
+
+  cartList.querySelectorAll('.cartSmallBtn').forEach(b=>{
+    b.onclick = (e) => {
+      const id = e.target.dataset.id;
+      const op = e.target.dataset.op;
+      if(op === 'inc') {
+        CART[id].qty += 1;
+        showNotification(`Added one more ${CART[id].item.name}`);
+      } else {
+        CART[id].qty -= 1;
+        if(CART[id].qty <= 0) {
+          showNotification(`Removed ${CART[id].item.name} from cart`);
+          delete CART[id];
+        } else {
+          showNotification(`Removed one ${CART[id].item.name}`);
+        }
+      }
+      renderCart();
+    };
+  });
+}
+
+/* ========== EVENT LISTENERS ========== */
+skipIntro.addEventListener('click', revealApp);
+introVideo.addEventListener('ended', revealApp);
+introVideo.addEventListener('error', () => {
+  console.log('Video error occurred');
+  showVideoFallback();
+  setTimeout(revealApp, 3000);
+});
+
+introVideo.addEventListener('loadedmetadata', initVideo);
+
+setTimeout(() => { 
+  if(introWrap.style.display !== 'none') {
+    console.log('Video timeout reached, proceeding...');
+    revealApp();
+  } 
+}, 8000);
+
+cartIcon.addEventListener('click', openCart);
+closeCart.addEventListener('click', closeCartModal);
+
+cartModal.addEventListener('click', (e) => {
+  if (e.target === cartModal) {
+    closeCartModal();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && cartModal.classList.contains('active')) {
+    closeCartModal();
+  }
+});
+
+btnViewMenu.addEventListener('click', () => {
+  renderProducts();
+  document.getElementById('menuSection').scrollIntoView({behavior:'smooth', block:'start'});
+});
+viewMenuBtn.addEventListener('click', () => {
+  renderProducts();
+  document.getElementById('menuSection').scrollIntoView({behavior:'smooth', block:'start'});
+});
+btnOrderNow.addEventListener('click', () => {
+  renderProducts();
+  document.getElementById('menuSection').scrollIntoView({behavior:'smooth', block:'start'});
+});
+catHot.addEventListener('click', () => {
+  renderProducts('hot');
+  document.getElementById('menuSection').scrollIntoView({behavior:'smooth', block:'start'});
+});
+catCold.addEventListener('click', () => {
+  renderProducts('cold');
+  document.getElementById('menuSection').scrollIntoView({behavior:'smooth', block:'start'});
+});
+backTopBtn.addEventListener('click', ()=> window.scrollTo({top:0, behavior:'smooth'}));
+
+/* checkout */
+checkoutBtn.addEventListener('click', () => {
+  const keys = Object.keys(CART);
+  if(keys.length === 0){ 
+    showNotification('Your cart is empty — add a coffee ☕'); 
+    return; 
+  }
+  let message = 'Order placed!\n\n';
+  let total = 0;
+  keys.forEach(k=>{
+    const c = CART[k]; 
+    message += `${c.qty} × ${c.item.name} — ₨${(c.item.price*c.qty).toFixed(2)}\n`; 
+    total += c.item.price*c.qty;
+  });
+  message += `\nTotal: ₨${total.toFixed(2)}\n\nThanks — The Debug Café ☕`;
+  
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+  `;
+  
+  const modalContent = document.createElement('div');
+  modalContent.style.cssText = `
+    background: var(--panel);
+    padding: 30px;
+    border-radius: 14px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.05);
+  `;
+  
+  modalContent.innerHTML = `
+    <h3 style="color: var(--accent); margin-top: 0;">Order Confirmed! ☕</h3>
+    <div style="text-align: left; margin: 20px 0; line-height: 1.6;">
+      ${message.replace(/\n/g, '<br>')}
+    </div>
+    <button id="closeModal" style="
+      background: var(--accent);
+      color: #0f0f10;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    ">Continue Shopping</button>
+  `;
+  
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+  
+  document.getElementById('closeModal').addEventListener('click', () => {
+    document.body.removeChild(modal);
+    CART = {}; 
+    renderCart();
+    closeCartModal();
+  });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Video will initialize automatically through event listeners
+});
+</script>
+</body>
+</html>
